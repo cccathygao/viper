@@ -29,6 +29,9 @@ from typing import List, Union
 from configs import config
 from utils import HiddenPrints
 
+# Fix for Protobuf Segmentation Fault
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+
 with open('api.key') as f:
     openai.api_key = f.read().strip()
 
