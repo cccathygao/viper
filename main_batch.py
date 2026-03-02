@@ -106,7 +106,7 @@ def worker_init(queue_results_):
 
 
 def main():
-    mp.set_start_method('spawn')
+    mp.set_start_method('spawn', force=True)
 
     from vision_processes import queues_in, finish_all_consumers, forward, manager
     from datasets import get_dataset
