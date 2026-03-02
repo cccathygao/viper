@@ -27,6 +27,10 @@ def get_dataset(config_dataset):
     elif dataset_name == 'NExTQA':
         from datasets.nextqa import NExTQADataset
         dataset = NExTQADataset(**config_dataset)
+    elif dataset_name == 'CVBench':
+        from datasets.cvbench import CVBenchDataset
+        dataset = CVBenchDataset(**config_dataset, 
+                                image_transforms=transforms.Compose([transforms.ToTensor()]))
     elif dataset_name == 'MyDataset':
         from datasets.my_dataset import MyDataset
         dataset = MyDataset(**config_dataset)

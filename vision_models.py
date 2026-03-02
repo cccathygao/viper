@@ -32,6 +32,10 @@ from utils import HiddenPrints
 with open('api.key') as f:
     openai.api_key = f.read().strip()
 
+# Redirect all API calls to your local Qwen server
+openai.api_base = "http://109.61.17.115:30001/v1"
+openai.api_key = "william"
+
 cache = Memory('cache/' if config.use_cache else None, verbose=0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 console = Console(highlight=False)
@@ -784,7 +788,8 @@ class GPT3Model(BaseModel):
             self.guess_prompt = f.read().strip()
         self.temperature = config.gpt3.temperature
         self.n_votes = config.gpt3.n_votes
-        self.model = config.gpt3.model
+        # self.model = config.gpt3.model
+        self.model = "qwen-vl2d5-3b-instruct"
 
     # initial cleaning for reference QA results
     @staticmethod
@@ -818,7 +823,7 @@ class GPT3Model(BaseModel):
         if self.n_votes > 1:
             response_ = []
             for i in range(len(prompts)):
-                if self.model == 'chatgpt':
+                if self.model == 'chatgpt' or "qwen" in self.model:
                     resp_i = [r['message']['content'] for r in
                               response['choices'][i * self.n_votes:(i + 1) * self.n_votes]]
                 else:
@@ -826,7 +831,7 @@ class GPT3Model(BaseModel):
                 response_.append(self.most_frequent(resp_i).lstrip())
             response = response_
         else:
-            if self.model == 'chatgpt':
+            if self.model == 'chatgpt' or "qwen" in self.model:
                 response = [r['message']['content'].lstrip() for r in response['choices']]
             else:
                 response = [r['text'].lstrip() for r in response['choices']]
@@ -849,7 +854,7 @@ class GPT3Model(BaseModel):
         if self.n_votes > 1:
             response_ = []
             for i in range(len(prompts)):
-                if self.model == 'chatgpt':
+                if self.model == 'chatgpt' or "qwen" in self.model:
                     resp_i = [r['message']['content'] for r in
                               response['choices'][i * self.n_votes:(i + 1) * self.n_votes]]
                 else:
@@ -857,7 +862,7 @@ class GPT3Model(BaseModel):
                 response_.append(self.most_frequent(resp_i))
             response = response_
         else:
-            if self.model == 'chatgpt':
+            if self.model == 'chatgpt' or "qwen" in self.model:
                 response = [r['message']['content'] for r in response['choices']]
             else:
                 response = [self.process_answer(r["text"]) for r in response['choices']]
@@ -871,7 +876,7 @@ class GPT3Model(BaseModel):
     def get_general(self, prompts) -> list[str]:
         response = self.query_gpt3(prompts, model=self.model, max_tokens=256, top_p=1, frequency_penalty=0,
                                    presence_penalty=0)
-        if self.model == 'chatgpt':
+        if self.model == 'chatgpt' or "qwen" in self.model:
             response = [r['message']['content'] for r in response['choices']]
         else:
             response = [r["text"] for r in response['choices']]
@@ -879,10 +884,11 @@ class GPT3Model(BaseModel):
 
     def query_gpt3(self, prompt, model="text-davinci-003", max_tokens=16, logprobs=None, stream=False,
                    stop=None, top_p=1, frequency_penalty=0, presence_penalty=0):
-        if model == "chatgpt":
+        if model == "chatgpt" or "qwen" in model:
             messages = [{"role": "user", "content": p} for p in prompt]
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                # model="gpt-3.5-turbo",
+                model="qwen-vl2d5-3b-instruct",
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=self.temperature,
@@ -958,11 +964,12 @@ def codex_helper(extended_prompt):
     assert 0 <= config.codex.temperature <= 1
     assert 1 <= config.codex.best_of <= 20
 
-    if config.codex.model in ("gpt-4", "gpt-3.5-turbo"):
+    if config.codex.model in ("gpt-4", "gpt-3.5-turbo") or "qwen" in str(config.codex.model) or True:
         if not isinstance(extended_prompt, list):
             extended_prompt = [extended_prompt]
         responses = [openai.ChatCompletion.create(
-            model=config.codex.model,
+            # model=config.codex.model,
+            model="qwen-vl2d5-3b-instruct",
             messages=[
                 # {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "system", "content": "Only answer with a function starting def execute_command."},
@@ -1171,7 +1178,7 @@ class BLIPModel(BaseModel):
         with warnings.catch_warnings(), HiddenPrints("BLIP"), torch.cuda.device(self.dev):
             max_memory = {gpu_number: torch.cuda.mem_get_info(self.dev)[0]}
 
-            self.processor = Blip2Processor.from_pretrained(f"Salesforce/{blip_v2_model_type}")
+            self.processor = Blip2Processor.from_pretrained(f"Salesforce/{blip_v2_model_type}", use_fast=False)
             # Device_map must be sequential for manual GPU selection
             try:
                 self.model = Blip2ForConditionalGeneration.from_pretrained(
