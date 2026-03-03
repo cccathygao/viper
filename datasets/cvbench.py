@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import re
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
@@ -67,13 +68,19 @@ class CVBenchDataset(Dataset):
         # Human provides the question, GPT provides the answer
         human_msg = next(m['value'] for m in sample['conversations'] if m['from'] == 'human')
         gpt_msg = next(m['value'] for m in sample['conversations'] if m['from'] == 'gpt')
+
+        # Extract Choice Letters (A, B, C, D) for possible_answers
+        # This is critical to force the model to return a letter
+        possible_answers = re.findall(r'\((\w)\)', human_msg)
         
         query = human_msg.strip()
         answer = gpt_msg.strip()
 
+        if possible_answers:
+            query += f"\nAnswer with only the letter of the correct option: {', '.join(possible_answers)}."
+
         # 3. Extract Possible Answers (Options)
         # We parse the query text to find the (Letter) Option format
-        import re
         possible_answers = re.findall(r'\([A-Z]\)\s*(.*?)(?=\n\(|(?:\n|$))', query)
 
         out_dict = {
@@ -100,10 +107,24 @@ class CVBenchDataset(Dataset):
 
     def post_process(self, prediction):
         """Clean the prediction to match ground truth format."""
-        prediction = general_postprocessing(prediction)
-        # If the ground truth is just 'a' and model says '(A) Dog', we strip to help matching
-        prediction = prediction.lower().strip()
-        return prediction
+        # prediction = general_postprocessing(prediction)
+        # # If the ground truth is just 'a' and model says '(A) Dog', we strip to help matching
+        # prediction = prediction.lower().strip()
+        # return prediction
+    
+        if not prediction:
+            return "none"
+        
+        prediction = str(prediction).strip()
+        
+        # 1. Check if prediction is exactly one of the letters (A, B, C, D)
+        match = re.search(r'\b([A-G])\b', prediction.upper())
+        if match:
+            # If there's a standalone letter, return it
+            return match.group(1).lower()
+        
+        # 2. Fallback to general cleaning
+        return general_postprocessing(prediction)
 
     def accuracy(self, prediction, ground_truth, *args):
         if len(prediction) == 0:
