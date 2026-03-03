@@ -31,6 +31,10 @@ def get_dataset(config_dataset):
         from datasets.cvbench import CVBenchDataset
         dataset = CVBenchDataset(**config_dataset, 
                                 image_transforms=transforms.Compose([transforms.ToTensor()]))
+    elif dataset_name == 'BLINK':
+        from datasets.blink import BLINKDataset
+        dataset = BLINKDataset(**config_dataset, 
+                                image_transforms=transforms.Compose([transforms.ToTensor()]))
     elif dataset_name == 'MyDataset':
         from datasets.my_dataset import MyDataset
         dataset = MyDataset(**config_dataset)
