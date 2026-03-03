@@ -105,25 +105,68 @@ class CVBenchDataset(Dataset):
         sample_path = os.path.join('../dataset', img_path)
         return sample_path
 
-    def post_process(self, prediction):
-        """Clean the prediction to match ground truth format."""
-        # prediction = general_postprocessing(prediction)
-        # # If the ground truth is just 'a' and model says '(A) Dog', we strip to help matching
-        # prediction = prediction.lower().strip()
-        # return prediction
+    # def post_process(self, prediction):
+    #     """Clean the prediction to match ground truth format."""
+    #     # prediction = general_postprocessing(prediction)
+    #     # # If the ground truth is just 'a' and model says '(A) Dog', we strip to help matching
+    #     # prediction = prediction.lower().strip()
+    #     # return prediction
     
-        if not prediction:
-            return "none"
+    #     if not prediction:
+    #         return "none"
+        
+    #     prediction = str(prediction).strip()
+        
+    #     # 1. Check if prediction is exactly one of the letters (A, B, C, D)
+    #     match = re.search(r'\b([A-G])\b', prediction.upper())
+    #     if match:
+    #         return match.group(1)
+        
+    #     # 2. Fallback to general cleaning
+    #     return general_postprocessing(prediction)
+
+    def post_process(self, prediction, sample_index=None):
+        """
+        Converts full sentence results into MCQ letters (A, B, C, D).
+        """
+        if prediction is None:
+            return ""
         
         prediction = str(prediction).strip()
         
-        # 1. Check if prediction is exactly one of the letters (A, B, C, D)
+        # 1. If the prediction is already just a letter (A-G), return it
+        import re
+        if len(prediction) == 1 and prediction.upper() in "ABCDEFG":
+            return prediction.upper()
+
+        # 2. Get the sample info to find the mapping of Letters -> Values
+        # We need the original query to know what (A) (B) (C) represented
+        if sample_index is not None:
+            sample = self.samples[sample_index]
+            human_msg = next(m['value'] for m in sample['conversations'] if m['from'] == 'human')
+            
+            # Find all options: e.g., [('A', '3'), ('B', '2'), ('C', '1')]
+            options = re.findall(r'\((\w)\)\s*(.*?)(?=\n\(|(?:\n|$))', human_msg)
+            
+            # 3. Search for the option values inside the prediction sentence
+            # We sort options by length (descending) to match "left side" before "left"
+            sorted_options = sorted(options, key=lambda x: len(x[1]), reverse=True)
+            
+            for letter, value in sorted_options:
+                val = value.strip().lower()
+                pred = prediction.lower()
+                
+                # Check if the specific value (e.g., "1" or "left") exists in the sentence
+                # Use word boundaries \b to avoid matching '1' in '10'
+                if re.search(r'\b' + re.escape(val) + r'\b', pred):
+                    return letter.upper()
+
+        # 4. Fallback: standard cleanup if no match found
         match = re.search(r'\b([A-G])\b', prediction.upper())
         if match:
             return match.group(1)
-        
-        # 2. Fallback to general cleaning
-        return general_postprocessing(prediction)
+            
+        return prediction.upper()
 
     def accuracy(self, prediction, ground_truth, *args):
         if len(prediction) == 0:
