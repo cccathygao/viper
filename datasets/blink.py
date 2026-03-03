@@ -36,43 +36,64 @@ class BLINKDataset(Dataset):
 
     def __getitem__(self, index):
         sample = self.samples[index]
-        
-        # BLINK usually contains 3 images for comparison tasks
         img_paths = sample['image'] 
         images = []
         
+        # Load all images in the list
         for p in img_paths:
-            # Handle pathing consistent with your cvbench.py setup
             if not os.path.isabs(p):
+                # Search in ../dataset or current dir
                 full_path = os.path.join('../dataset', p)
+                if not os.path.exists(full_path):
+                    full_path = p
             else:
                 full_path = p
                 
             img = Image.open(full_path).convert("RGB")
-            if self.image_transforms:
-                img = self.image_transforms(img)
             images.append(img)
 
-        # Extract Question and Answer from 'conversations'
+        # Concatenate images horizontally so ImagePatch receives one object
+        if len(images) > 1:
+            widths, heights = zip(*(i.size for i in images))
+            total_width = sum(widths)
+            max_height = max(heights)
+            
+            # Create a black canvas and paste images side-by-side
+            new_im = Image.new('RGB', (total_width, max_height), (0, 0, 0))
+            x_offset = 0
+            for im in images:
+                new_im.paste(im, (x_offset, 0))
+                x_offset += im.size[0]
+            image = new_im
+        elif len(images) == 1:
+            image = images[0]
+            widths = [image.size[0]]
+        else:
+            raise ValueError(f"No images found for sample {sample.get('id', index)}")
+
+        if self.image_transforms:
+            image = self.image_transforms(image)
+
+        # Extract Question and Answer
         human_msg = next(m['value'] for m in sample['conversations'] if m['from'] == 'human')
         gpt_msg = next(m['value'] for m in sample['conversations'] if m['from'] == 'gpt')
-
-        # Extract MCQ options (A, B, C...)
         possible_answers = re.findall(r'\((\w)\)', human_msg)
         
         query = human_msg.strip()
         answer = gpt_msg.strip()
 
-        # Tailor the prompt for ViperGPT/Code-generation logic
-        # if possible_answers:
-        #     query += (
-        #         "\n\nWrite a python program that uses the provided images to find the answer. "
-        #         "The first image is the reference. Ensure the final result returned is the "
-        #         f"single uppercase letter corresponding to the correct choice: {', '.join(possible_answers)}."
-        #     )
+        # Add layout hint to the query for the LLM
+        if len(images) > 1:
+            layout_hint = (
+                f"Note: The input is {len(images)} images concatenated horizontally. "
+                f"The first image (reference) ends at x={widths[0]}. "
+                f"The second image is between x={widths[0]} and x={widths[0]+widths[1]}. "
+                "Use these horizontal boundaries to distinguish images.\n\n"
+            )
+            query = layout_hint + query
 
         return {
-            "image": images, # Returning the list of processed images
+            "image": image, # Now a single Image/Tensor
             "query": query,
             "answer": answer,
             "sample_id": sample.get('id', index),
