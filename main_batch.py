@@ -46,21 +46,11 @@ def run_program(parameters, queues_in_, input_type_, retrying=False):
 
     code, sample_id, image, possible_answers, query = parameters
 
-    # Clean the code from LLM
-    import re
-    code = re.sub(r'```python\n?', '', code)
-    code = re.sub(r'```\n?', '', code)
-    code = code.strip('`').strip()
-    
-    # Remove the def execute_command line so only the body remains
-    lines = code.split('\n')
-    code = '\n'.join([l for l in lines if 'def execute_command' not in l])
-
     code_header = f'def execute_command_{sample_id}(' \
                   f'{input_type_}, possible_answers, query, ' \
                   f'ImagePatch, VideoSegment, ' \
                   'llm_query, bool_to_yesno, distance, best_image_match):\n' \
-                  f'    # Answer is:'
+                  f'    # Answer is:\n'
     code = code_header + code
 
     try:
