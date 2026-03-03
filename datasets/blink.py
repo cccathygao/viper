@@ -5,7 +5,6 @@ import re
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
-# Assuming general_postprocessing is available in your environment
 from datasets import general_postprocessing 
 
 class BLINKDataset(Dataset):
@@ -65,12 +64,12 @@ class BLINKDataset(Dataset):
         answer = gpt_msg.strip()
 
         # Tailor the prompt for ViperGPT/Code-generation logic
-        if possible_answers:
-            query += (
-                "\n\nWrite a python program that uses the provided images to find the answer. "
-                "The first image is the reference. Ensure the final result returned is the "
-                f"single uppercase letter corresponding to the correct choice: {', '.join(possible_answers)}."
-            )
+        # if possible_answers:
+        #     query += (
+        #         "\n\nWrite a python program that uses the provided images to find the answer. "
+        #         "The first image is the reference. Ensure the final result returned is the "
+        #         f"single uppercase letter corresponding to the correct choice: {', '.join(possible_answers)}."
+        #     )
 
         return {
             "image": images, # Returning the list of processed images
@@ -84,6 +83,14 @@ class BLINKDataset(Dataset):
             "query_type": 'MCQ'
         }
 
+    def get_sample_path(self, index):
+        sample = self.samples[index]
+        img_path = sample['image']
+        if isinstance(img_path, list):
+            img_path = img_path[0]
+        sample_path = os.path.join('../dataset', img_path)
+        return sample_path
+    
     def post_process(self, prediction):
         if not prediction:
             return "none"
