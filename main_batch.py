@@ -20,6 +20,7 @@ from tqdm import tqdm
 from configs import config
 from utils import seed_everything
 import datasets
+from datasets import general_postprocessing
 
 # See https://github.com/pytorch/pytorch/issues/11201, https://github.com/pytorch/pytorch/issues/973
 # Not for dataloader, but for multiprocessing batches
@@ -215,6 +216,26 @@ def main():
                 all_query_types += batch['query_type']
                 all_queries += batch['query']
                 all_img_paths += [dataset.get_sample_path(idx) for idx in batch['index']]
+
+                # Per-sample correctness (when log_per_sample is True)
+                if getattr(config, 'log_per_sample', False):
+                    for j in range(len(results)):
+                        pred = results[j][0]
+                        gt = batch['answer'][j]
+                        sid = batch['sample_id'][j]
+                        idx = batch['index'][j]
+                        if hasattr(dataset, 'post_process'):
+                            try:
+                                p_clean = dataset.post_process(pred, idx)
+                                g_clean = dataset.post_process(str(gt), idx)
+                                correct = (p_clean == g_clean)
+                            except Exception:
+                                correct = (general_postprocessing(pred) == str(gt).strip())
+                        else:
+                            correct = (general_postprocessing(pred) == str(gt).strip())
+                        status = "correct" if correct else "incorrect"
+                        console.print(f"  Sample {sid}: {status} (pred={pred!r}, gt={gt!r})", flush=True)
+
                 if i % config.log_every == 0:
                     try:
                         accuracy = dataset.accuracy(all_results, all_answers, all_possible_answers, all_query_types)
