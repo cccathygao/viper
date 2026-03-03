@@ -80,13 +80,23 @@ class CVBenchDataset(Dataset):
             "image": img_tensor,
             "query": query,
             "answer": answer,
-            "id": sample.get('id', index),
+            "sample_id": sample.get('id', index),
             "index": index,
             "possible_answers": possible_answers,
-            "info_to_prompt": query
+            "info_to_prompt": query,
+            "extra_context": '',
+            "query_type": 'MCQ'
         }
 
         return out_dict
+
+    def get_sample_path(self, index):
+        sample = self.samples[index]
+        img_path = sample['image']
+        if isinstance(img_path, list):
+            img_path = img_path[0]
+        sample_path = os.path.join('../dataset', img_path)
+        return sample_path
 
     def post_process(self, prediction):
         """Clean the prediction to match ground truth format."""

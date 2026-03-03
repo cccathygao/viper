@@ -1,6 +1,7 @@
 multiprocessing: False                              # Run the models and samples in parallel
 path_pretrained_models: './pretrained_models'       # Path to the pretrained models
-execute_code: False                                 # Execute the code after generating it. Only applies to main_batch
+execute_code: True                                # Execute the code after generating it. Only applies to main_batch
+log_every: 1
 
 dataset:                                            # Dataset configuration
     dataset_name: 'CVBench'                       # Dataset name
