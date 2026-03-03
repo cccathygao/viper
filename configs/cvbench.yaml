@@ -4,7 +4,7 @@ execute_code: False                                 # Execute the code after gen
 
 dataset:                                            # Dataset configuration
     dataset_name: 'CVBench'                       # Dataset name
-    data_path: '../dataset/CVBench'                               # Dataset path
+    data_path: '../dataset/cvbench_data.jsonl'                               # Dataset path
     split: ''                                       # Dataset split. If '', it assumes there is only one split
     prompt: ./prompts/benchmarks/gqa.prompt
     max_samples:                                    # Maximum number of samples to load
