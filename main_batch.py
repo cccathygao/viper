@@ -59,7 +59,8 @@ def run_program(parameters, queues_in_, input_type_, retrying=False):
     code_header = f'def execute_command_{sample_id}(' \
                   f'{input_type_}, possible_answers, query, ' \
                   f'ImagePatch, VideoSegment, ' \
-                  'llm_query, bool_to_yesno, distance, best_image_match):\n' \
+                  'llm_query, bool_to_yesno, distance, best_image_match, question=None):\n' \
+                  f'    if question is None: question = query\n' \
                   f'    # Answer is:\n'
     code = code_header + code
 
