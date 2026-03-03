@@ -39,6 +39,7 @@ class BLINKDataset(Dataset):
         img_paths = sample['image'] 
         images = []
         
+        # Load all images in the list
         for p in img_paths:
             full_path = os.path.join('../dataset', p) if not os.path.isabs(p) else p
             img = Image.open(full_path).convert("RGB")
