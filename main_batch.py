@@ -56,6 +56,12 @@ def run_program(parameters, queues_in_, input_type_, retrying=False):
     lines = code.split('\n')
     code = '\n'.join([l for l in lines if 'def execute_command' not in l])
 
+    # If the code is just a single letter or a short word without 'return', wrap it
+    if len(code) <= 2 and code.upper() in 'ABCDEFG':
+        code = f"return '{code.upper()}'"
+    elif 'return' not in code and len(code.split('\n')) == 1:
+        code = f"return '{code}'"
+
     code_header = f'def execute_command_{sample_id}(' \
                   f'{input_type_}, possible_answers, query, ' \
                   f'ImagePatch, VideoSegment, ' \

@@ -77,11 +77,11 @@ class CVBenchDataset(Dataset):
         answer = gpt_msg.strip()
 
         if possible_answers:
-            query += f"\nAnswer with only the letter of the correct option: {', '.join(possible_answers)}."
-
-        # 3. Extract Possible Answers (Options)
-        # We parse the query text to find the (Letter) Option format
-        possible_answers = re.findall(r'\([A-Z]\)\s*(.*?)(?=\n\(|(?:\n|$))', query)
+            query += (
+            "\n\nWrite a python program that first analyzes the image to find the answer, "
+            "then ensures the final result returned is the single uppercase letter corresponding "
+            f"to the correct choice: {', '.join(possible_answers)}."
+        )
 
         out_dict = {
             "image": img_tensor,
@@ -120,8 +120,7 @@ class CVBenchDataset(Dataset):
         # 1. Check if prediction is exactly one of the letters (A, B, C, D)
         match = re.search(r'\b([A-G])\b', prediction.upper())
         if match:
-            # If there's a standalone letter, return it
-            return match.group(1).lower()
+            return match.group(1)
         
         # 2. Fallback to general cleaning
         return general_postprocessing(prediction)
