@@ -186,6 +186,7 @@ else:
 
 
 def forward(model_name, *args, queues=None, **kwargs):
+    print(f'[DEBUG] vision_processes.py, forward({model_name})\n', flush=True)
     """
     Sends data to consumer (calls their "forward" method), and returns the result
     """

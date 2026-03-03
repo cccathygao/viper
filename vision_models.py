@@ -44,6 +44,52 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 console = Console(highlight=False)
 HiddenPrints = partial(HiddenPrints, console=console, use_newline=config.multiprocessing)
 
+def _debug_summarize(value, *, max_str: int = 800, max_items: int = 10) -> str:
+    try:
+        if isinstance(value, torch.Tensor):
+            t = value
+            summary = f"torch.Tensor(shape={tuple(t.shape)}, dtype={t.dtype}, device={t.device})"
+            try:
+                if t.numel() <= 20:
+                    summary += f", value={t.detach().cpu()!r}"
+                else:
+                    flat = t.detach().flatten()
+                    n = min(max_items, flat.numel())
+                    summary += f", sample={flat[:n].cpu().tolist()!r}"
+            except Exception:
+                pass
+            return summary
+    except Exception:
+        pass
+
+    if isinstance(value, (list, tuple)):
+        try:
+            head = list(value)[:max_items]
+            return f"{type(value).__name__}(len={len(value)}): {repr(head)[:max_str]}"
+        except Exception:
+            return f"{type(value).__name__}"
+
+    if isinstance(value, dict):
+        try:
+            keys = list(value.keys())[:max_items]
+            return f"dict(keys={keys!r})"
+        except Exception:
+            return "dict(?)"
+
+    if isinstance(value, str):
+        s = value.replace("\n", "\\n")
+        if len(s) > max_str:
+            s = s[:max_str] + "..."
+        return f"str(len={len(value)}): {s}"
+
+    if isinstance(value, Image.Image):
+        return f"PIL.Image(size={value.size}, mode={value.mode})"
+
+    r = repr(value)
+    if len(r) > max_str:
+        r = r[:max_str] + "..."
+    return r
+
 
 # --------------------------- Base abstract model --------------------------- #
 
@@ -103,13 +149,17 @@ class ObjectDetector(BaseModel):
 
     @torch.no_grad()
     def forward(self, image: torch.Tensor):
+        print(f'[DEBUG] vision_models.py, ObjectDetector\n', flush=True)
+        
         """get_object_detection_bboxes"""
         input_batch = image.to(self.dev).unsqueeze(0)  # create a mini-batch as expected by the model
         detections = self.detection_model(input_batch)
         p = detections['pred_boxes']
         p = torch.stack([p[..., 0], 1 - p[..., 3], p[..., 2], 1 - p[..., 1]], -1)  # [left, lower, right, upper]
         detections['pred_boxes'] = p
-        return detections
+        result = detections
+        print(f'[DEBUG] vision_models.py, ObjectDetector return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
 
 class DepthEstimationModel(BaseModel):
@@ -134,6 +184,8 @@ class DepthEstimationModel(BaseModel):
 
     @torch.no_grad()
     def forward(self, image: torch.Tensor):
+        print(f'[DEBUG] vision_models.py, DepthEstimationModel\n', flush=True)
+
         """Estimate depth map"""
         image_numpy = image.cpu().permute(1, 2, 0).numpy() * 255
         input_batch = self.transform(image_numpy).to(self.dev)
@@ -148,7 +200,9 @@ class DepthEstimationModel(BaseModel):
         # We compute the inverse because the model returns inverse depth
         to_return = 1 / prediction
         to_return = to_return.cpu()
-        return to_return  # To save: plt.imsave(path_save, prediction.cpu().numpy())
+        result = to_return
+        print(f'[DEBUG] vision_models.py, DepthEstimationModel return: {_debug_summarize(result)}\n', flush=True)
+        return result  # To save: plt.imsave(path_save, prediction.cpu().numpy())
 
 
 class CLIPModel(BaseModel):
@@ -306,6 +360,8 @@ class CLIPModel(BaseModel):
         return res
 
     def forward(self, image, prompt, task='score', return_index=True, negative_categories=None, return_scores=False):
+        print(f'[DEBUG] vision_models.py, CLIPModel\n', flush=True)
+
         if task == 'classify':
             categories = prompt
             clip_sim = self.classify(image, categories, return_index=return_index)
@@ -318,7 +374,9 @@ class CLIPModel(BaseModel):
             out = idx
         if not isinstance(out, int):
             out = out.cpu()
-        return out
+        result = out
+        print(f'[DEBUG] vision_models.py, CLIPModel return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
 
 class MaskRCNNModel(BaseModel):
@@ -358,10 +416,14 @@ class MaskRCNNModel(BaseModel):
         return detections
 
     def forward(self, image, return_labels=False):
+        print(f'[DEBUG] vision_models.py, MaskRCNNModel\n', flush=True)
+
         obj_detections = self.detect(image, return_labels)
         # Move to CPU before sharing. Alternatively we can try cloning tensors in CUDA, but may not work
         obj_detections = [(v.to('cpu') if isinstance(v, torch.Tensor) else list(v)) for v in obj_detections]
-        return obj_detections
+        result = obj_detections
+        print(f'[DEBUG] vision_models.py, MaskRCNNModel return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
 
 class OwlViTModel(BaseModel):
@@ -383,6 +445,8 @@ class OwlViTModel(BaseModel):
 
     @torch.no_grad()
     def forward(self, image: torch.Tensor, text: List[str], return_labels: bool = False):
+        print(f'[DEBUG] vision_models.py, OwlViTModel\n', flush=True)
+
         if isinstance(image, list):
             raise TypeError("image has to be a torch tensor, not a list")
         if isinstance(text, str):
@@ -411,9 +475,13 @@ class OwlViTModel(BaseModel):
         if return_labels:
             labels = labels[indices_good]
             labels = [text_original[lab].re('a photo of a ') for lab in labels]
-            return boxes, labels
+            result = (boxes, labels)
+            print(f'[DEBUG] vision_models.py, OwlViTModel return: {_debug_summarize(result)}\n', flush=True)
+            return result
 
-        return boxes.cpu()  # [x_min, y_min, x_max, y_max]
+        result = boxes.cpu()  # [x_min, y_min, x_max, y_max]
+        print(f'[DEBUG] vision_models.py, OwlViTModel return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
 
 class GLIPModel(BaseModel):
@@ -600,13 +668,20 @@ class GLIPModel(BaseModel):
                     self.confidence_threshold = original_confidence_threshold
                 if return_labels:
                     # subtract 1 because it's 1-indexed for some reason
-                    return bboxes, inference_output.get_field("labels").cpu().numpy() - 1
-                return bboxes
+                    result = (bboxes, inference_output.get_field("labels").cpu().numpy() - 1)
+                    print(f'[DEBUG] vision_models.py, GLIPModel return: {_debug_summarize(result)}\n', flush=True)
+                    return result
+                result = bboxes
+                print(f'[DEBUG] vision_models.py, GLIPModel return: {_debug_summarize(result)}\n', flush=True)
+                return result
 
         self.glip_demo = OurGLIPDemo(*args, dev=self.dev)
 
     def forward(self, *args, **kwargs):
-        return self.glip_demo.forward(*args, **kwargs)
+        print(f'[DEBUG] vision_models.py, GLIPModel\n', flush=True)
+        result = self.glip_demo.forward(*args, **kwargs)
+        print(f'[DEBUG] vision_models.py, GLIPModel wrapper return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
 
 class TCLModel(BaseModel):
@@ -758,6 +833,7 @@ class TCLModel(BaseModel):
             return torch.argmax(score_matrix).item()
 
     def forward(self, image, texts, task='classify', return_index=True):
+        print(f'[DEBUG] vision_models.py, TCLModel\n', flush=True)
         if task == 'classify':
             best_text = self.classify(image, texts, return_index=return_index)
             out = best_text
@@ -766,7 +842,9 @@ class TCLModel(BaseModel):
             out = score
         if isinstance(out, torch.Tensor):
             out = out.cpu()
-        return out
+        result = out
+        print(f'[DEBUG] vision_models.py, TCLModel return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
 
 @cache.cache(ignore=['result'])
@@ -887,6 +965,7 @@ class GPT3Model(BaseModel):
 
     def query_gpt3(self, prompt, model="text-davinci-003", max_tokens=16, logprobs=None, stream=False,
                    stop=None, top_p=1, frequency_penalty=0, presence_penalty=0):
+        print(f'[DEBUG] vision_models.py, GPT3Model query_gpt3 (qwen)\n', flush=True)
         if model == "chatgpt" or "qwen" in model:
             messages = [{"role": "user", "content": p} for p in prompt]
             response = openai.ChatCompletion.create(
@@ -910,9 +989,12 @@ class GPT3Model(BaseModel):
                 presence_penalty=presence_penalty,
                 n=self.n_votes,
             )
-        return response
+        result = response
+        print(f'[DEBUG] vision_models.py, GPT3Model query_gpt3 return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
     def forward(self, prompt, process_name):
+        print(f'[DEBUG] vision_models.py, GPT3Model forward\n', flush=True)
         if not self.to_batch:
             prompt = [prompt]
 
@@ -954,7 +1036,9 @@ class GPT3Model(BaseModel):
 
         if not self.to_batch:
             results = results[0]
-        return results
+        result = results
+        print(f'[DEBUG] vision_models.py, GPT3Model forward return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
     @classmethod
     def list_processes(cls):
@@ -1031,8 +1115,12 @@ class CodexModel(BaseModel):
                 self.fixed_code = f.read()
 
     def forward(self, prompt, input_type='image', prompt_file=None, base_prompt=None, extra_context=None):
+        print(f'[DEBUG] vision_models.py, CodexModel\n', flush=True)
+
         if config.use_fixed_code:  # Use the same program for every sample, like in socratic models
-            return [self.fixed_code] * len(prompt) if isinstance(prompt, list) else self.fixed_code
+            result = [self.fixed_code] * len(prompt) if isinstance(prompt, list) else self.fixed_code
+            print(f'[DEBUG] vision_models.py, CodexModel return: {_debug_summarize(result)}\n', flush=True)
+            return result
 
         if prompt_file is not None and base_prompt is None:  # base_prompt takes priority
             with open(prompt_file) as f:
@@ -1056,6 +1144,7 @@ class CodexModel(BaseModel):
         if not isinstance(prompt, list):
             result = result[0]
 
+        print(f'[DEBUG] vision_models.py, CodexModel return: {_debug_summarize(result)}\n', flush=True)
         return result
 
     def forward_(self, extended_prompt):
@@ -1241,6 +1330,7 @@ class BLIPModel(BaseModel):
         return generated_text
 
     def forward(self, image, question=None, task='caption'):
+        print(f'[DEBUG] vision_models.py, BLIPModel\n', flush=True)
         if not self.to_batch:
             image, question, task = [image], [question], [task]
 
@@ -1265,7 +1355,9 @@ class BLIPModel(BaseModel):
 
         if not self.to_batch:
             response = response[0]
-        return response
+        result = response
+        print(f'[DEBUG] vision_models.py, BLIPModel return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
 
 class SaliencyModel(BaseModel):
@@ -1303,6 +1395,7 @@ class SaliencyModel(BaseModel):
 
     @torch.no_grad()
     def forward(self, image):
+        print(f'[DEBUG] vision_models.py, SaliencyModel\n', flush=True)
         image_t = self.transform({'image': self.transform_pil(image)})
         image_t['image_resized'] = image_t['image_resized'].unsqueeze(0).to(self.dev)
         image_t['image'] = image_t['image'].unsqueeze(0).to(self.dev)
@@ -1312,7 +1405,9 @@ class SaliencyModel(BaseModel):
         image_masked = image.clone()
         image_masked[:, mask_foreground] = 0
 
-        return image_masked
+        result = image_masked
+        print(f'[DEBUG] vision_models.py, SaliencyModel return: {_debug_summarize(result)}\n', flush=True)
+        return result
 
 
 class XVLMModel(BaseModel):
@@ -1430,8 +1525,11 @@ class XVLMModel(BaseModel):
         return res
 
     def forward(self, image, text, task='score', negative_categories=None):
+        print(f'[DEBUG] vision_models.py, XVLMModel\n', flush=True)
         if task == 'score':
             score = self.score(image, text)
         else:  # binary
             score = self.binary_score(image, text, negative_categories=negative_categories)
-        return score.cpu()
+        result = score.cpu()
+        print(f'[DEBUG] vision_models.py, XVLMModel return: {_debug_summarize(result)}\n', flush=True)
+        return result
