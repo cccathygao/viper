@@ -76,12 +76,12 @@ class CVBenchDataset(Dataset):
         query = human_msg.strip()
         answer = gpt_msg.strip()
 
-        if possible_answers:
-            query += (
-            "\n\nWrite a python program that first analyzes the image to find the answer, "
-            "then ensures the final result returned is the single uppercase letter corresponding "
-            f"to the correct choice: {', '.join(possible_answers)}."
-        )
+        # if possible_answers:
+        #     query += (
+        #     "\n\nWrite a python program that first analyzes the image to find the answer, "
+        #     "then ensures the final result returned is the single uppercase letter corresponding "
+        #     f"to the correct choice: {', '.join(possible_answers)}."
+        # )
 
         out_dict = {
             "image": img_tensor,
