@@ -63,6 +63,9 @@ def run_program(parameters, queues_in_, input_type_, retrying=False):
                   f'    # Answer is:\n'
     code = code_header + code
 
+    print(f'\n[DEBUG] Running sample {sample_id}', flush=True)
+    print(f'[DEBUG] Code to run:\n{code}\n', flush=True)
+
     try:
         exec(compile(code, 'Codex', 'exec'), globals())
     except Exception as e:

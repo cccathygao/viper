@@ -18,6 +18,7 @@ class CVBenchDataset(Dataset):
         self.data_path = data_path
         self.image_transforms = image_transforms
         self.samples = []
+        self.input_type = 'image'
 
         # 1. Handle JSONL loading
         if data_path.endswith('.jsonl'):
@@ -45,12 +46,15 @@ class CVBenchDataset(Dataset):
     def __getitem__(self, index):
         sample = self.samples[index]
         
-        # Load Image: Assumes 'image' field is a path relative to the data_path directory
-        # or an absolute path. Adjust if images are in a specific subfolder.
+        # 1. Fix Image Path: Extract from list and handle absolute/relative paths
         img_path = sample['image']
+        if isinstance(img_path, list):
+            img_path = img_path[0]
+
         if not os.path.isabs(img_path):
-            # If the jsonl only has filenames, join with the directory of the data_path
-            img_path = os.path.join(os.path.dirname(self.data_path), img_path)
+            # Joins the directory of the jsonl with the image path
+            # img_path = os.path.join(os.path.dirname(self.data_path), img_path)
+            img_path = os.path.join('../dataset', img_path)
             
         img = Image.open(img_path).convert("RGB")
 
@@ -59,24 +63,26 @@ class CVBenchDataset(Dataset):
         else:
             img_tensor = img
 
-        # Format the query with Multiple Choice options if they exist
-        question = sample['question']
-        options_text = ""
-        # Common CV-Bench keys: 'option_a', 'option_b', etc.
-        for letter in ['a', 'b', 'c', 'd']:
-            key = f'option_{letter}'
-            if key in sample and sample[key]:
-                options_text += f" ({letter.upper()}) {sample[key]}"
+        # 2. Extract Question and Answer from 'conversations'
+        # Human provides the question, GPT provides the answer
+        human_msg = next(m['value'] for m in sample['conversations'] if m['from'] == 'human')
+        gpt_msg = next(m['value'] for m in sample['conversations'] if m['from'] == 'gpt')
         
-        query = f"{question}{options_text}"
+        query = human_msg.strip()
+        answer = gpt_msg.strip()
+
+        # 3. Extract Possible Answers (Options)
+        # We parse the query text to find the (Letter) Option format
+        import re
+        possible_answers = re.findall(r'\([A-Z]\)\s*(.*?)(?=\n\(|(?:\n|$))', query)
 
         out_dict = {
             "image": img_tensor,
             "query": query,
-            "answer": str(sample.get('answer', '')),
+            "answer": answer,
             "id": sample.get('id', index),
             "index": index,
-            "possible_answers": [sample.get(f'option_{l}') for l in ['a','b','c','d'] if f'option_{l}' in sample],
+            "possible_answers": possible_answers,
             "info_to_prompt": query
         }
 
