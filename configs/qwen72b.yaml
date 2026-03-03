@@ -1,0 +1,10 @@
+openai:
+  api_base: "http://128.241.246.246:3000/v1"
+  api_key: "william"
+
+gpt3:
+  model: "Qwen2.5-VL-72B-Instruct"
+
+codex:
+  model: "Qwen2.5-VL-72B-Instruct"
+

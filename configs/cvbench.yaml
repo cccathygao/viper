@@ -4,7 +4,7 @@ execute_code: True                                # Execute the code after gener
 
 dataset:                                            # Dataset configuration
     dataset_name: 'CVBench'                       # Dataset name
-    data_path: '../dataset/cvbench_data_small_test.jsonl'                               # Dataset path
+    data_path: '../dataset/cvbench_data_500sample.jsonl'                               # Dataset path
     split: ''                                       # Dataset split. If '', it assumes there is only one split
     prompt: ./prompts/benchmarks/gqa.prompt
     max_samples:                                    # Maximum number of samples to load
@@ -12,8 +12,8 @@ dataset:                                            # Dataset configuration
     start_sample: 0                                 # Start sample index. Only used if max_samples is not None
 
 load_models:                                        # Which pretrained models to load
-    maskrcnn: False
-    clip: False
+    maskrcnn: True
+    clip: True
     glip: True
     owlvit: False
     tcl: False
@@ -63,7 +63,7 @@ use_cache: True                                     # Use cache for the models t
 clear_cache: False                                  # Clear stored cache
 use_cached_codex: False                             # Use previously-computed Codex results
 cached_codex_path: ''                               # Path to the csv results file from which to load Codex results
-log_every: 20                                       # Log accuracy every n batches
+log_every: 1                                       # Log accuracy every n batches
 wandb: False                                        # Use Weights and Biases
 
 blip_half_precision: True                           # Use 8bit (Faster but slightly less accurate) for BLIP if True

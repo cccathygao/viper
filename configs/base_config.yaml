@@ -70,3 +70,7 @@ blip_v2_model_type: blip2-flan-t5-xxl               # Which model to use for BLI
 
 use_fixed_code: False                               # Use a fixed code for all samples (do not generate with Codex)
 fixed_code_file: ./prompts/fixed_code/blip2.prompt  # Path to the fixed code file
+
+openai:                                             # OpenAI / Qwen API routing
+    api_base: "http://109.61.17.115:30001/v1"       # Default API base (Qwen 3B endpoint)
+    api_key: "william"                              # Default API key or token (can be overridden)

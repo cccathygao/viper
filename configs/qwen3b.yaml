@@ -1,0 +1,10 @@
+openai:
+  api_base: "http://109.61.17.115:30001/v1"
+  api_key: "william"
+
+gpt3:
+  model: "qwen-vl2d5-3b-instruct"
+
+codex:
+  model: "qwen-vl2d5-3b-instruct"
+
