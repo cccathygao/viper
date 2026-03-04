@@ -1,7 +1,10 @@
 # For example:
 multiprocessing: False
+execute_code: True
+log_every: 1
 path_pretrained_models: './pretrained_models'
 dataset:
+    batch_size: 1
     data_path: 'data'
 blip_v2_model_type: blip2-flan-t5-xl  # Change to blip2-flan-t5-xl for smaller GPUs
 blip_half_precision: True
