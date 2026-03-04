@@ -234,7 +234,7 @@ def main():
                         else:
                             correct = (general_postprocessing(pred) == str(gt).strip())
                         status = "correct" if correct else "incorrect"
-                        console.print(f"  Sample {sid}: {status} (pred={pred!r}, gt={gt!r})", flush=True)
+                        console.print(f"  Sample {sid}: {status} (pred={pred!r}, gt={gt!r})")
 
                 if i % config.log_every == 0:
                     try:

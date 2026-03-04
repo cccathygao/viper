@@ -8,6 +8,7 @@ import torch
 
 from utils import draw_bounding_boxes
 
+DEFAULT_LOG_PATH = "intermediate_results.txt"
 
 def load_cvbench_image_map(data_path: str) -> Dict[str, str]:
     """
@@ -164,34 +165,37 @@ def main() -> None:
         description="Visualize GLIPModel intermediate bounding boxes from ViperGPT debug logs."
     )
     parser.add_argument(
-        "--log",
+        "--dir",
         type=str,
-        default="intermediate_results.txt",
-        help="Path to intermediate_results.txt containing [DEBUG] logs.",
+        required=True,
+        default='',
+        help="Directory to read intermediate_results.txt from.",
     )
     parser.add_argument(
         "--dataset_path",
         type=str,
-        default="cvbench_data_small_test.jsonl",
-        help="Path to CVBench jsonl used as dataset.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="debug_intermediate_visualizations",
-        help="Directory to save visualized images.",
+        required=True,
+        default='',
+        help="Path to dataset.",
     )
 
     args = parser.parse_args()
 
-    sample_to_image = load_cvbench_image_map(args.dataset_path)
-    sample_to_bboxes = parse_glip_bboxes_from_log(args.log)
+    log_path = os.path.join('analysis', args.dir, DEFAULT_LOG_PATH)
+    dataset_path = os.path.join('../dataset', args.dataset_path)
+    output_dir = os.path.join('analysis', args.dir, 'debug_intermediate_visualizations')
+    print(f"[INFO] Reading log from {log_path}")
+    print(f"[INFO] Reading dataset from {dataset_path}")
+    print(f"[INFO] Saving visualizations to {output_dir}")
+
+    sample_to_image = load_cvbench_image_map(dataset_path)
+    sample_to_bboxes = parse_glip_bboxes_from_log(log_path)
 
     if not sample_to_bboxes:
         print("[WARN] No GLIPModel return blocks found in log.")
         return
 
-    draw_and_save_boxes(sample_to_image, sample_to_bboxes, args.output_dir)
+    draw_and_save_boxes(sample_to_image, sample_to_bboxes, output_dir)
 
 
 if __name__ == "__main__":
