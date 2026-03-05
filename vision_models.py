@@ -1105,6 +1105,29 @@ def codex_helper(extended_prompt):
     return resp
 
 
+def codex_react_chat(messages, model_name=None, max_tokens=512, temperature=0.):
+    """
+    Chat completion for ReAct continuation turns. Uses same openai config as codex_helper.
+    Returns the assistant message content.
+    """
+    model_name = model_name or config.codex.model
+    max_tokens = max_tokens or config.codex.max_tokens
+    temperature = temperature if temperature is not None else config.codex.temperature
+    print(f'[DEBUG] vision_models.py, codex_react_chat(model={model_name})\n', flush=True)
+    response = openai.ChatCompletion.create(
+        model=model_name,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        top_p=1.,
+        frequency_penalty=0,
+        presence_penalty=0,
+    )
+    content = response['choices'][0]['message']['content'] if response.get('choices') else ""
+    print(f'[DEBUG] vision_models.py, codex_react_chat return: {_debug_summarize(content)}\n', flush=True)
+    return content
+
+
 class CodexModel(BaseModel):
     name = 'codex'
     requires_gpu = False

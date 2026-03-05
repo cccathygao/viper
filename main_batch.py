@@ -1,4 +1,5 @@
 import datetime
+import json
 import math
 import os
 import pathlib
@@ -81,6 +82,14 @@ def _is_valid_code_body(code):
         return False
     if '"""A Python class containing a crop' in code or "cropped_image : array_like" in code:
         return False
+    # Reject trivial placeholders or comment-only stubs
+    if "# your code here" in code or "<python code here" in code:
+        return False
+    lines = [l for l in code.split("\n") if l.strip()]
+    if not lines:
+        return False
+    if all(l.lstrip().startswith("#") for l in lines):
+        return False
     return True
 
 
@@ -93,8 +102,8 @@ def _build_react_continuation_prompt(exec_result):
         f"<interpreter>\nResult:\n{exec_result}\n</interpreter>\n\n"
         "If the result above answers the query, output the final answer in this format (no more code):\n"
         "<answer>\\n\\boxed{{'your answer here'}}\\n</answer>\n\n"
-        "If you need to run more code to refine your answer, output:\n"
-        "<code>\\n```python\\n# your code here\\n```\\n</code>"
+        "If you need to run more code to refine your answer, respond ONLY with a <code> block containing a "
+        "```python ... ``` fenced snippet with executable code, and no explanations outside the code.\n"
     )
 
 
@@ -230,11 +239,15 @@ def main():
     all_possible_answers = []
     all_query_types = []
 
-    # Multi-turn ReAct is only meaningful when we are actually executing code.
-    use_react = getattr(config.codex, "model", None) is not None and (
-        "gpt-4" in str(config.codex.model)
-        or "gpt-3.5" in str(config.codex.model)
-        or "qwen" in str(config.codex.model).lower()
+    # Multi-turn ReAct: only when config.codex.multi_turn is True and model supports chat.
+    use_react = (
+        getattr(config.codex, "multi_turn", False)
+        and getattr(config.codex, "model", None) is not None
+        and (
+            "gpt-4" in str(config.codex.model)
+            or "gpt-3.5" in str(config.codex.model)
+            or "qwen" in str(config.codex.model).lower()
+        )
     )
 
     with mp.Pool(processes=num_processes, initializer=worker_init, initargs=(queues_results,)) \
@@ -264,6 +277,7 @@ def main():
                     if use_react:
                         # ReAct-style multi-turn: turn 1 uses CodexModel (same as single-turn), turn 2+ use chat.
                         results = []
+                        all_intermediate_logs = []  # Accumulate logs for all samples
                         max_turns = getattr(config.codex, "max_turns", 5)
                         from vision_models import codex_react_chat
 
@@ -303,6 +317,10 @@ def main():
                                 {"role": "user", "content": _build_react_continuation_prompt(exec_result)},
                             ]
 
+                            intermediate_log = [
+                                {"turn": 1, "messages": [{"role": m["role"], "message": m["content"]} for m in messages]}
+                            ]
+
                             for turn in range(1, max_turns):
                                 print(f'[DEBUG] main_batch.py, ReAct sample {sample_id} turn {turn + 1}', flush=True)
                                 try:
@@ -311,7 +329,13 @@ def main():
                                     console.print(f"Error in ReAct chat for sample {sample_id}, turn {turn + 1}: {e}")
                                     break
 
-                                print(f'[DEBUG] main_batch.py, ReAct sample {sample_id} turn {turn + 1} messages: {messages}', flush=True)
+                                intermediate_log.append({
+                                    "turn": turn + 1,
+                                    "messages": [{"role": m["role"], "message": m["content"]} for m in messages]
+                                })
+                                _current_log = all_intermediate_logs + [{"sample_id": sample_id, "turns": intermediate_log}]
+                                with open("intermediate_messages.json", "w", encoding="utf-8") as f:
+                                    json.dump(_current_log, f, indent=2, ensure_ascii=False)
                                 print(f'[DEBUG] main_batch.py, ReAct sample {sample_id} turn {turn + 1} response: {response_text}', flush=True)
 
                                 python_blocks = _extract_python_code_blocks(response_text)
@@ -340,12 +364,13 @@ def main():
                                         ans = re.search(r'<answer>(.*?)</answer>', response_text, re.DOTALL)
                                         if ans:
                                             final_response = ans.group(1).strip()
-                                    else:
-                                        final_response = response_text.strip()
                                     break
 
                                 print(f'[DEBUG] main_batch.py, ReAct sample {sample_id} turn {turn + 1} final response: {final_response}', flush=True)
                                         
+                            all_intermediate_logs.append({"sample_id": sample_id, "turns": intermediate_log})
+                            with open("intermediate_messages.json", "w", encoding="utf-8") as f:
+                                json.dump(all_intermediate_logs, f, indent=2, ensure_ascii=False)
                             combined_code = "\n\n# ---- NEXT TOOL CALL ----\n\n".join(turn_codes) if turn_codes else ""
                             results.append((final_response, combined_code))
 
